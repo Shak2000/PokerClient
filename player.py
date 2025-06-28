@@ -46,7 +46,6 @@ class SimplePlayer(Bot):
         'KTs': [0.5900, 0.4130, 0.3190, 0.2600, 0.2190],
         'KTo': [0.5900, 0.4130, 0.3190, 0.2600, 0.2190],
         'K9s': [0.5700, 0.3860, 0.2900, 0.2310, 0.1910],
-        'K9o': [0.5700, 0.3860, 0.2900, 0.2310, 0.1910],
         'K8s': [0.5500, 0.3610, 0.2650, 0.2080, 0.1700],
 
         # Queen-High hands
@@ -101,21 +100,14 @@ class SimplePlayer(Bot):
 
         probability = 0
         if round_state.round_num == 0:
-            hand = self.player_hands[0][0] + self.player_hands[1][0]
-            if self.player_hands[0][0] != self.player_hands[1][0]:
-                if self.player_hands[0][1] == self.player_hands[1][1]:
-                    hand += 's'
-                else:
-                    hand += 'o'
-
-            if hand in self.hands_data.keys():
-                probability = self.hands_data[hand][self.num_active_players - 2]
-            else:
-                hand_alt = hand[1] + hand[0] + hand[2]
-                if hand_alt in self.hands_data.keys():
-                    probability = self.hands_data[hand_alt][self.num_active_players - 2]
+            probability = self.prob_preflop(probability)
             if probability == 0 and amount_to_call > 0:
+                print(f"Folded on a hand of {self.player_hands}")
                 return PokerAction.FOLD, 0
+            elif probability > 0:
+                print(f"Called on a hand of {self.player_hands}")
+            else:
+                print("Checked as the big blind")
 
         raised = False
         for player_action in round_state.player_actions.values():
@@ -140,3 +132,18 @@ class SimplePlayer(Bot):
         print("All final scores: ", all_scores)
         print("Active players hands: ", active_players_hands)
         self.num_active_players = len(active_players_hands)
+
+    def prob_preflop(self, probability):
+        hand = self.player_hands[0][0] + self.player_hands[1][0]
+        if self.player_hands[0][0] != self.player_hands[1][0]:
+            if self.player_hands[0][1] == self.player_hands[1][1]:
+                hand += 's'
+            else:
+                hand += 'o'
+        if hand in self.hands_data.keys():
+            probability = self.hands_data[hand][self.num_active_players - 2]
+        elif len(hand) == 3:
+            hand_alt = hand[1] + hand[0] + hand[2]
+            if hand_alt in self.hands_data.keys():
+                probability = self.hands_data[hand_alt][self.num_active_players - 2]
+        return probability
