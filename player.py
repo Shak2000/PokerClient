@@ -98,22 +98,23 @@ class SimplePlayer(Bot):
         print("Player called get action")
         amount_to_call = round_state.current_bet - round_state.player_bets[str(self.id)]
 
-        probability = 0
-        if round_state.round_num == 0:
-            probability = self.prob_preflop(probability)
-            if probability == 0 and amount_to_call > 0:
-                print(f"Folded on a hand of {self.player_hands}")
-                return PokerAction.FOLD, 0
-            elif probability > 0:
-                print(f"Called on a hand of {self.player_hands}")
-            else:
-                print("Checked as the big blind")
-
         raised = False
         for player_action in round_state.player_actions.values():
             if player_action == "Raise":
                 raised = True
                 break
+
+        probability = 0
+        if round_state.round_num == 0:
+            probability = self.prob_preflop(probability)
+            if probability == 0 and amount_to_call > 0:
+                return PokerAction.FOLD, 0
+
+            three_bet = 3 * self.blind_amount - round_state.player_bets[str(self.id)]
+            if round_state.min_raise <= three_bet:
+                return PokerAction.RAISE, three_bet
+            elif (round_state.pot + sum(round_state.side_pots)) * probability - amount_to_call * (1 - probability) < 0:
+                return PokerAction.FOLD, 0
 
         if not raised and round_state.round_num == 1:
             return PokerAction.RAISE, 100
