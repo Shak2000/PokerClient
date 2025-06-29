@@ -72,6 +72,7 @@ class SimplePlayer(Bot):
         self.big_blind_player_id = 0
         self.small_blind_player_id = 0
         self.all_players = []
+        self.position = 0
         self.num_active_players = 0
 
     def on_start(self, starting_chips: int, player_hands: List[str], blind_amount: int, big_blind_player_id: int, small_blind_player_id: int, all_players: List[int]):
@@ -86,7 +87,7 @@ class SimplePlayer(Bot):
         self.blind_amount = blind_amount
         self.big_blind_player_id = big_blind_player_id
         self.small_blind_player_id = small_blind_player_id
-        self.all_players = all_players
+        self.all_players = [all_players[i] for i in range(len(all_players))]
         self.num_active_players = len(all_players)
 
     def on_round_start(self, round_state: RoundStateClient, remaining_chips: int):
@@ -102,19 +103,25 @@ class SimplePlayer(Bot):
         for player_action in round_state.player_actions.values():
             if player_action == "Raise":
                 raised = True
-                break
+            elif player_action == "Fold":
+                self.num_active_players -= 1
 
         probability = 0
         if round_state.round_num == 0:
+            self.position = (len(round_state.player_actions) + 2) % len(self.all_players)
             probability = self.prob_preflop(probability)
-            if probability == 0 and amount_to_call > 0:
-                return PokerAction.FOLD, 0
+            if probability - 1.4 * (self.num_active_players - 1 - self.position) < 1.0 / self.num_active_players:
+                if amount_to_call > 0:
+                    return PokerAction.FOLD, 0
+                return PokerAction.CHECK, 0
 
             three_bet = 3 * self.blind_amount - round_state.player_bets[str(self.id)]
             if round_state.min_raise <= three_bet:
                 return PokerAction.RAISE, three_bet
-            elif (round_state.pot + sum(round_state.side_pots)) * probability - amount_to_call * (1 - probability) < 0:
+            elif round_state.pot * probability - amount_to_call * (1 - probability) < 0:
                 return PokerAction.FOLD, 0
+        else:
+            self.position = len(round_state.player_actions)
 
         if not raised and round_state.round_num == 1:
             return PokerAction.RAISE, 100
