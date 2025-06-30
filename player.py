@@ -4,7 +4,7 @@ from bot import Bot
 from type.poker_action import PokerAction
 from type.round_state import RoundStateClient
 
-import eval7
+from treys import Deck, Evaluator, Card
 
 
 class SimplePlayer(Bot):
@@ -82,6 +82,7 @@ class SimplePlayer(Bot):
         print("Big blind player id: ", big_blind_player_id)
         print("Small blind player id: ", small_blind_player_id)
         print("All players in game: ", all_players)
+
         self.starting_chips = starting_chips
         self.player_hands = [player_hands[i] for i in range(len(player_hands))]
         self.blind_amount = blind_amount
@@ -148,6 +149,7 @@ class SimplePlayer(Bot):
                 hand += 's'
             else:
                 hand += 'o'
+
         if hand in self.hands_data.keys():
             probability = self.hands_data[hand][self.num_active_players - 2]
         elif len(hand) == 3:
@@ -155,3 +157,41 @@ class SimplePlayer(Bot):
             if hand_alt in self.hands_data.keys():
                 probability = self.hands_data[hand_alt][self.num_active_players - 2]
         return probability
+
+    def estimate_equity(self, community_cards, hero_hole_cards, num_players):
+        evaluator = Evaluator()
+        hero_wins = 0
+        hero_hand = [Card.new(c) for c in hero_hole_cards]
+        known_community = [Card.new(c) for c in community_cards]
+        cards_needed = 5 - len(community_cards)
+
+        used_cards = hero_hand + known_community
+        deck = Deck()
+        for c in used_cards:
+            deck.cards.remove(c)
+
+        for _ in range(100):
+            deck.shuffle()
+            villain_hands = []
+            for _ in range(num_players - 1):
+                villain_hands.append([deck.draw(1)[0], deck.draw(1)[0]])
+
+            remaining_community = []
+            for _ in range(cards_needed):
+                remaining_community.append(deck.draw(1)[0])
+
+            full_community = known_community + remaining_community
+            hero_score = evaluator.evaluate(full_community, hero_hand)
+            villain_scores = []
+            for hand in villain_hands:
+                score = evaluator.evaluate(full_community, hand)
+                villain_scores.append(score)
+
+            if hero_score <= min(villain_scores):
+                hero_wins += 1
+
+            deck = Deck()
+            for c in used_cards:
+                deck.cards.remove(c)
+
+        return hero_wins / 100.0
